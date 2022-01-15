@@ -1,0 +1,72 @@
+The results of a view query are not stored anywhere on disk and the view is recreated every time the query is executed. Materialized views are actual structures stored within the database and written to disk. They are updated based on the parameters defined when they are created.
+
+Syntax:
+	CREATE MATERIALIZED VIEW view_name
+	AS
+	query
+	WITH [NO] DATA;
+	
+How it works.
+
+	1.)First, specify the view_name after the CREATE MATERIALIZED VIEW clause.
+	
+	2.)Second, add the query that gets data from the underlying tables after the AS keyword.
+	
+	3.)Third, if you want to load data into the materialized view at the creation time, use the WITH DATA option; otherwise, you use 		WITH NO DATA. In case you use WITH NO DATA, the view is flagged as unreadable. It means that you cannot query data from the view 		until you load data into it.
+	
+	
+How you will load data into query
+	
+	To load data into a materialized view, you use the  REFRESH MATERIALIZED VIEW statement as shown below:
+	
+		Syntax:- REFRESH MATERIALIZED VIEW view_name;
+	
+	When you refresh data for a materialized view, PostgreSQL locks the entire table therefore you cannot query data against it. To 		avoid this, you can use the CONCURRENTLY option.
+	
+		Syntax:- REFRESH MATERIALIZED VIEW CONCURRENTLY view_name;
+
+	With CONCURRENTLY option, PostgreSQL creates a temporary updated version of the materialized view, compares two versions, and 		performs INSERT and UPDATE only the differences.
+
+	You can query against a materialized view while it is being updated. One requirement for using CONCURRENTLY option is that the 		materialized view must have a UNIQUE index.
+
+	
+Removing materialized views
+	
+		Syntax:- DROP MATERIALIZED VIEW view_name;
+		
+		
+	
+Example:-
+	CREATE MATERIALIZED VIEW rental_by_category
+	AS
+	 SELECT c.name AS category,
+	    sum(p.amount) AS total_sales
+	   FROM (((((payment p
+	     JOIN rental r ON ((p.rental_id = r.rental_id)))
+	     JOIN inventory i ON ((r.inventory_id = i.inventory_id)))
+	     JOIN film f ON ((i.film_id = f.film_id)))
+	     JOIN film_category fc ON ((f.film_id = fc.film_id)))
+	     JOIN category c ON ((fc.category_id = c.category_id)))
+	  GROUP BY c.name
+	  ORDER BY sum(p.amount) DESC
+	WITH NO DATA;
+	
+	
+	Because of the WITH NO DATA option, you cannot query data from the view. If you try to do so, you’ll get an error message as 		follows:
+			SELECT * FROM rental_by_category;
+			
+			O/p:- [Err] ERROR: materialized view "rental_by_category" has not been populated
+			      HINT: Use the REFRESH MATERIALIZED VIEW command.
+			      
+			REFRESH MATERIALIZED VIEW rental_by_category;
+			
+			Now, if you query data again, you will get the result as expected.
+	
+			
+	However, to refresh it with CONCURRENTLY option, you need to create a UNIQUE index for the view first.
+	
+		CREATE UNIQUE INDEX rental_category ON rental_by_category (category);
+		
+	Let’s refresh data concurrently for the rental_by_category view.
+	
+		REFRESH MATERIALIZED VIEW CONCURRENTLY rental_by_category;
